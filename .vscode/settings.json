@@ -1,0 +1,9 @@
+{
+    "nixEnvSelector.nixFile": "${workspaceFolder}/flake.nix",
+    "nixEnvSelector.useFlakes": true,
+    "nixEnvSelector.flakeShell": "default",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build",
+        "--query-driver=/nix/store/*/bin/amdclang++"
+    ]
+}

@@ -1,0 +1,4 @@
+build/
+.direnv/
+.rocprofv3/
+.cache
