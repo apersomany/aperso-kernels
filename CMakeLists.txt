@@ -7,7 +7,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(hip CONFIG REQUIRED)
+find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(rocblas CONFIG REQUIRED)
+find_package(rocwmma CONFIG REQUIRED)
 
 set(sources
   hip/kernels/gemm.cpp
@@ -36,4 +38,10 @@ foreach(directory IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
 endforeach()
 
 target_link_directories(gemm PRIVATE $ENV{ROCPROFILER_SDK_PATH}/lib)
-target_link_libraries(gemm PRIVATE hip::host hip::device roc::rocblas rocprofiler-sdk)
+target_link_libraries(gemm PRIVATE
+  hip::host
+  hip::device
+  roc::rocblas
+  roc::rocwmma
+  rocprofiler-sdk
+)

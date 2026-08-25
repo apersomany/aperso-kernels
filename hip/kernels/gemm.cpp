@@ -1,5 +1,7 @@
 #include "gemm.hpp"
 
+#include <rocwmma/rocwmma.hpp>
+
 namespace
 {
 
