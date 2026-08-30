@@ -1,54 +1,81 @@
 #include "gemm.hpp"
 
-#include <rocwmma/rocwmma.hpp>
-
-namespace
-{
+namespace {
 
 constexpr int tile_size = 16;
+constexpr int wave_size = 32;
+constexpr int frag_size = tile_size * tile_size / wave_size;
 
-__global__ void tiled_gemm_kernel(
+static_assert(tile_size * tile_size % wave_size == 0);
+
+using ab_frag_type = short __attribute__((ext_vector_type(frag_size)));
+using cd_frag_type = float __attribute__((ext_vector_type(frag_size)));
+
+__device__ ab_frag_type load_ab_frag(
+	const gemm_kernel::input_type* source
+) {
+	return *reinterpret_cast<const ab_frag_type*>(source);
+}
+
+__device__ ab_frag_type transpose_ab_frag(
+	const ab_frag_type& source_frag
+) {
+	int lane = int(threadIdx.x) % tile_size;
+	int lane_group = int(threadIdx.x) / tile_size;
+	ab_frag_type identity_frag = {};
+	ab_frag_type zero_frag = {};
+	if(lane_group == lane / frag_size) {
+		identity_frag[lane % frag_size] = __builtin_bit_cast(
+			short,
+			gemm_kernel::input_type(1.0f)
+		);
+	}
+	return __builtin_amdgcn_wmma_bf16_16x16x16_bf16_w32_gfx12(
+		source_frag,
+		identity_frag,
+		zero_frag
+	);
+}
+
+__global__ void wmma_gemm_kernel(
 	const gemm_kernel::input_type* a,
 	const gemm_kernel::input_type* b,
 	float* c,
-	int m,
 	int n,
 	int k
-)
-{
-	__shared__ gemm_kernel::input_type shared_a[tile_size][tile_size];
-	__shared__ gemm_kernel::input_type shared_b[tile_size][tile_size];
+) {
+	int lane = int(threadIdx.x) % tile_size;
+	int lane_group = int(threadIdx.x) / tile_size;
+	int tile_row = int(blockIdx.y) * tile_size;
+	int tile_col = int(blockIdx.x) * tile_size;
+	int frag_col = lane_group * frag_size;
+	cd_frag_type c_frag = {};
 
-	int row = int(blockIdx.y) * tile_size + int(threadIdx.y);
-	int column = int(blockIdx.x) * tile_size + int(threadIdx.x);
-	float accumulator = 0.0f;
-
-	for(int tile_start = 0; tile_start < k; tile_start += tile_size)
-	{
-		int a_column = tile_start + int(threadIdx.x);
-		int b_row = tile_start + int(threadIdx.y);
-		shared_a[threadIdx.y][threadIdx.x] =
-			row < m && a_column < k ? a[row * k + a_column]
-									: gemm_kernel::input_type(0.0f);
-		shared_b[threadIdx.y][threadIdx.x] =
-			b_row < k && column < n ? b[b_row * n + column]
-									: gemm_kernel::input_type(0.0f);
-		__syncthreads();
-
-		for(int inner = 0; inner < tile_size; ++inner)
-			accumulator += static_cast<float>(shared_a[threadIdx.y][inner])
-						   * static_cast<float>(shared_b[inner][threadIdx.x]);
-		__syncthreads();
+	for(int tile_start = 0; tile_start < k; tile_start += tile_size) {
+		ab_frag_type a_frag = load_ab_frag(
+			a + (tile_row + lane) * k + tile_start + frag_col
+		);
+		ab_frag_type b_frag = load_ab_frag(
+			b + (tile_start + lane) * n + tile_col + frag_col
+		);
+		b_frag = transpose_ab_frag(b_frag);
+		c_frag = __builtin_amdgcn_wmma_f32_16x16x16_bf16_w32_gfx12(
+			b_frag,
+			a_frag,
+			c_frag
+		);
 	}
 
-	if(row < m && column < n)
-		c[row * n + column] = accumulator;
+	for(int element = 0; element < frag_size; ++element) {
+		int row = tile_row + lane;
+		int col = tile_col + frag_col + element;
+		c[row * n + col] = c_frag[element];
+	}
 }
 
 }
 
-namespace gemm_kernel
-{
+namespace gemm_kernel {
 
 void launch(
 	const input_type* a,
@@ -58,28 +85,14 @@ void launch(
 	int n,
 	int k,
 	hipStream_t stream
-)
-{
-	constexpr int block_dimension = tile_size;
-	dim3 block(block_dimension, block_dimension, 1);
-	dim3 grid(
-		(unsigned(n) + block_dimension - 1) / block_dimension,
-		(unsigned(m) + block_dimension - 1) / block_dimension,
-		1
-	);
-	hipLaunchKernelGGL(
-		tiled_gemm_kernel,
-		grid,
-		block,
-		0,
-		stream,
-		a,
-		b,
-		c,
-		m,
-		n,
-		k
-	);
+) {
+	if(m % tile_size != 0 || n % tile_size != 0 || k % tile_size != 0) {
+		return;
+	}
+
+	dim3 block(wave_size, 1, 1);
+	dim3 grid(unsigned(n) / tile_size, unsigned(m) / tile_size, 1);
+	hipLaunchKernelGGL(wmma_gemm_kernel, grid, block, 0, stream, a, b, c, n, k);
 }
 
 }

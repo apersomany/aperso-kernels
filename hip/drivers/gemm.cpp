@@ -4,17 +4,14 @@
 #include <cstdlib>
 #include <vector>
 
-namespace gemm_driver
-{
-namespace
-{
+namespace gemm_driver {
+namespace {
 
 void stop_on_failure(
 	const char* library,
 	const char* operation,
 	const char* message
-)
-{
+) {
 	std::fprintf(
 		stderr,
 		"error: %s failed during %s\n  %s\n",
@@ -27,8 +24,7 @@ void stop_on_failure(
 
 float input_value(
 	size_t index
-)
-{
+) {
 	return float(int(index % 13) - 6) * 0.03125f;
 }
 
@@ -37,25 +33,24 @@ float input_value(
 void check(
 	hipError_t result,
 	const char* operation
-)
-{
-	if(result != hipSuccess)
+) {
+	if(result != hipSuccess) {
 		stop_on_failure("HIP", operation, hipGetErrorString(result));
+	}
 }
 
 void check(
 	rocblas_status result,
 	const char* operation
-)
-{
-	if(result != rocblas_status_success)
+) {
+	if(result != rocblas_status_success) {
 		stop_on_failure("rocBLAS", operation, rocblas_status_to_string(result));
+	}
 }
 
 buffers allocate(
 	const shape& dimensions
-)
-{
+) {
 	buffers values;
 	check(
 		hipMalloc(
@@ -92,16 +87,17 @@ void initialize(
 	const shape& dimensions,
 	buffers& values,
 	hipStream_t stream
-)
-{
+) {
 	size_t a_count = size_t(dimensions.m) * dimensions.k;
 	size_t b_count = size_t(dimensions.k) * dimensions.n;
 	std::vector<gemm_kernel::input_type> host_a(a_count);
 	std::vector<gemm_kernel::input_type> host_b(b_count);
-	for(size_t index = 0; index < a_count; ++index)
+	for(size_t index = 0; index < a_count; ++index) {
 		host_a[index] = gemm_kernel::input_type(input_value(index));
-	for(size_t index = 0; index < b_count; ++index)
+	}
+	for(size_t index = 0; index < b_count; ++index) {
 		host_b[index] = gemm_kernel::input_type(input_value(index + 17));
+	}
 
 	check(
 		hipMemcpyAsync(
@@ -123,8 +119,8 @@ void initialize(
 		),
 		"copy B"
 	);
-	size_t output_bytes =
-		size_t(dimensions.m) * dimensions.n * sizeof(*values.custom);
+	size_t output_bytes = size_t(dimensions.m) * dimensions.n
+						  * sizeof(*values.custom);
 	check(
 		hipMemsetAsync(values.custom, 0, output_bytes, stream),
 		"clear custom output"
@@ -140,8 +136,7 @@ void launch_custom(
 	const shape& dimensions,
 	const buffers& values,
 	hipStream_t stream
-)
-{
+) {
 	gemm_kernel::launch(
 		values.a,
 		values.b,
@@ -157,8 +152,7 @@ void launch_reference(
 	const shape& dimensions,
 	const buffers& values,
 	rocblas_handle handle
-)
-{
+) {
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
 	check(
@@ -195,8 +189,7 @@ void launch_reference(
 std::vector<float> copy_output(
 	const shape& dimensions,
 	const float* values
-)
-{
+) {
 	std::vector<float> host_values(size_t(dimensions.m) * dimensions.n);
 	check(
 		hipMemcpy(
@@ -212,23 +205,25 @@ std::vector<float> copy_output(
 
 void release(
 	buffers& values
-)
-{
-	if(values.a != nullptr)
+) {
+	if(values.a != nullptr) {
 		check(hipFree(values.a), "hipFree A");
-	if(values.b != nullptr)
+	}
+	if(values.b != nullptr) {
 		check(hipFree(values.b), "hipFree B");
-	if(values.custom != nullptr)
+	}
+	if(values.custom != nullptr) {
 		check(hipFree(values.custom), "hipFree custom output");
-	if(values.reference != nullptr)
+	}
+	if(values.reference != nullptr) {
 		check(hipFree(values.reference), "hipFree reference output");
+	}
 	values = {};
 }
 
 rocblas_handle create_reference_handle(
 	hipStream_t stream
-)
-{
+) {
 	rocblas_handle handle = nullptr;
 	check(rocblas_create_handle(&handle), "rocblas_create_handle");
 	check(rocblas_set_stream(handle, stream), "rocblas_set_stream");
@@ -237,10 +232,10 @@ rocblas_handle create_reference_handle(
 
 void destroy_reference_handle(
 	rocblas_handle handle
-)
-{
-	if(handle != nullptr)
+) {
+	if(handle != nullptr) {
 		check(rocblas_destroy_handle(handle), "rocblas_destroy_handle");
+	}
 }
 
 }

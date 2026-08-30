@@ -9,7 +9,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(hip CONFIG REQUIRED)
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(rocblas CONFIG REQUIRED)
-find_package(rocwmma CONFIG REQUIRED)
 
 set(sources
   hip/kernels/gemm.cpp
@@ -42,6 +41,5 @@ target_link_libraries(gemm PRIVATE
   hip::host
   hip::device
   roc::rocblas
-  roc::rocwmma
   rocprofiler-sdk
 )

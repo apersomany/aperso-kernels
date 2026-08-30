@@ -2,7 +2,7 @@
 
 A small hand-written HIP GEMM for learning GPU kernel development.
 
-The interface is contiguous row-major BF16 `[M, K] × [K, N] →` FP32 `[M, N]`. Shapes use the form `MxKxN`.
+The interface is contiguous row-major BF16 `[M, K] × [K, N] →` FP32 `[M, N]`. Shapes use the form `MxKxN`. Each dimension must be a multiple of 16.
 
 ## Commands
 
@@ -40,11 +40,11 @@ nix run .#att -- 1024x1024x1024
 
 The executable validates the kernel against rocBLAS. Profiling output is written below `build/trace` or `build/att`.
 
-The default target is `gfx1200`. Select one or more targets with `GPU_ARCHITECTURE`:
+The WMMA kernel requires an RDNA 4 target. The default is `gfx1200`; select another compatible target with `GPU_ARCHITECTURE`:
 
 ```bash
-GPU_ARCHITECTURE=gfx1036 gemm-build
-GPU_ARCHITECTURE="gfx1200,gfx1036" gemm-build
+GPU_ARCHITECTURE=gfx1201 gemm-build
+GPU_ARCHITECTURE="gfx1200,gfx1201" gemm-build
 ```
 
 CMake writes its compilation database to `build/compile_commands.json`.

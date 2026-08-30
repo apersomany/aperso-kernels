@@ -14,7 +14,6 @@
         rocm.rocm-comgr
         rocm.rocm-runtime
         rocm.rocblas
-        rocm.rocwmma
         rocm.rocprofiler-sdk.dev
       ];
       command_dependencies = [
@@ -69,7 +68,7 @@
             --output-directory build/trace \
             --output-format csv \
             --kernel-trace \
-            --kernel-include-regex tiled_gemm_kernel \
+            --kernel-include-regex wmma_gemm_kernel \
             -- ./build/gemm "$@" --no-profile
         '';
         att = ''
@@ -78,7 +77,7 @@
           exec rocprofv3 \
             --att \
             -d build/att \
-            --kernel-include-regex tiled_gemm_kernel \
+            --kernel-include-regex wmma_gemm_kernel \
             -- ./build/gemm "$@" --no-profile
         '';
       };

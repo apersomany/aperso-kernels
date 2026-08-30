@@ -3,8 +3,7 @@
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_runtime.h>
 
-namespace gemm_kernel
-{
+namespace gemm_kernel {
 
 using input_type = hip_bfloat16;
 

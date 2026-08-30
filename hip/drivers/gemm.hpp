@@ -6,18 +6,15 @@
 
 #include <vector>
 
-namespace gemm_driver
-{
+namespace gemm_driver {
 
-struct shape
-{
+struct shape {
 	int m;
 	int n;
 	int k;
 };
 
-struct buffers
-{
+struct buffers {
 	gemm_kernel::input_type* a = nullptr;
 	gemm_kernel::input_type* b = nullptr;
 	float* custom = nullptr;
