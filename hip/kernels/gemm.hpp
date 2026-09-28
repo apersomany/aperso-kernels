@@ -1,19 +1,30 @@
 #pragma once
 
-#include <hip/hip_bfloat16.h>
 #include <hip/hip_runtime.h>
 
 namespace gemm_kernel {
 
-using input_type = hip_bfloat16;
+// Row-major BF16 [M, K] x [K, N] -> FP32 [M, N]
+using input_type = __bf16;
+using output_type = float;
 
-void launch(
+struct shape {
+	int m;
+	int n;
+	int k;
+};
+
+// Shapes must be positive multiples of this tile
+extern const shape tile;
+
+bool supports(const shape& s);
+
+// Returns hipErrorInvalidValue for unsupported shapes
+hipError_t launch(
 	const input_type* a,
 	const input_type* b,
-	float* c,
-	int m,
-	int n,
-	int k,
+	output_type* c,
+	const shape& s,
 	hipStream_t stream
 );
 
